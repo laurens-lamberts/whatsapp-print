@@ -15,7 +15,7 @@ export const meta: MetaFunction = () => {
 };
 
 const MESSAGE_RENDER_INTERVAL = 3;
-const MESSAGE_RENDER_LIMIT = 100;
+const MESSAGE_RENDER_LIMIT = 30;
 
 interface ChatMessage {
   datetime?: Date;
@@ -50,66 +50,100 @@ export default function Index() {
   const parseFolder = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files === null) return;
 
-    // Iterate over the FileList object
-
     const newAttachments: File[] = [];
+
+    let chatFile: File | undefined = undefined;
 
     for (let i = 0; i < e.target.files.length; i++) {
       const file = e.target.files[i];
       if (file.name === "_chat.txt") {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const text = e?.target?.result as string;
-          setChat(
-            text
-              .split("\n")
-              .filter((line) => line.includes("] ")) // filter out lines without "] "
-              .map((line) => {
-                const [datetimeUntrimmed, senderMessage] = line
-                  .replace(/\u200e/g, "")
-                  .split("] ");
-                let attachmentName: string | undefined = undefined;
-
-                // Check if the message is defined and contains an attachment
-                if (line.includes("<attached:")) {
-                  const filename = line
-                    .split("<attached: ")[1]
-                    .replace(">", "");
-                  attachmentName = filename;
-                }
-
-                const [sender, message] = senderMessage.split(": ");
-                const datetime = datetimeUntrimmed.replace("[", "");
-
-                let parsedDate: Date | undefined = undefined;
-
-                try {
-                  parsedDate = parseDate(datetime);
-                } catch (e) {
-                  console.error(e);
-                }
-
-                return {
-                  datetime: parsedDate,
-                  sender,
-                  message,
-                  color:
-                    sender === "Marit"
-                      ? "#666"
-                      : sender === "Laurens"
-                      ? "green"
-                      : "black",
-                  attachmentName, // Add the attachmentName to the object
-                };
-              })
-          );
-        };
-        reader.readAsText(file);
+        // This will be processed later
+        chatFile = file;
       } else {
         newAttachments.push(file);
       }
     }
     setAttachments(newAttachments);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e?.target?.result as string;
+
+      const lines = text
+        .split("\n")
+        .filter((line) => line.includes("] ")) // filter out lines without "] "
+        .map((line) => line.replace(/\u200e/g, ""));
+
+      console.log("lines", lines);
+
+      let previousLine = "";
+      const chatMessages = lines.reduce((acc, line) => {
+        const datetimePattern = /^\[\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2}\]/;
+        if (!datetimePattern.test(line)) {
+          previousLine += " " + line;
+          return acc;
+        }
+
+        if (previousLine) {
+          acc.push(previousLine);
+          previousLine = "";
+        }
+
+        previousLine = line;
+        return acc;
+      }, []);
+
+      if (previousLine) {
+        chatMessages.push(previousLine);
+      }
+
+      setChat(
+        chatMessages.map((line) => {
+          const [datetimeUntrimmed, senderMessage] = line.split("] ");
+          let attachmentName: string | undefined = undefined;
+
+          // Check if the message is defined and contains an attachment
+          if (line.includes("<attached:")) {
+            console.log(
+              "there seems to be an attachment... <-- probably incorrect!"
+            );
+            const filename = line.split("<attached: ")[1].replace(">", "");
+            attachmentName = filename;
+          }
+
+          const [sender, message] = senderMessage.split(": ");
+          const datetime = datetimeUntrimmed.replace("[", "");
+
+          let parsedDate: Date | undefined = undefined;
+
+          if (datetime) {
+            try {
+              parsedDate = parseDate(datetime);
+            } catch (e) {
+              console.error(e, line);
+            }
+          }
+
+          return {
+            datetime: parsedDate,
+            sender,
+            message: attachmentName ? "" : message,
+            color:
+              sender === "Marit"
+                ? "#666"
+                : sender === "Laurens"
+                ? "green"
+                : "black",
+            attachmentName,
+          };
+        })
+      );
+    };
+    if (chatFile) {
+      reader.readAsText(chatFile);
+    } else {
+      alert("No chat file found");
+    }
   };
 
   const intervalRef = useRef<ReturnType<typeof setInterval>>();
@@ -182,9 +216,7 @@ export default function Index() {
         directory=""
         webkitdirectory=""
         type="file"
-        onChange={(e) => {
-          parseFolder(e);
-        }}
+        onChange={(e) => parseFolder(e)}
       />
       <div style={{ flex: 1, gap: 8 }}>
         {consecutiveMessages.map((message, i) => (

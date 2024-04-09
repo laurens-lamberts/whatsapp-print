@@ -15,7 +15,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body
+        style={{
+          backgroundColor: "#111",
+          margin: 0,
+          paddingInline: 20,
+        }}
+      >
         {children}
         <ScrollRestoration />
         <Scripts />

@@ -15,12 +15,14 @@ export const meta: MetaFunction = () => {
 };
 
 const MESSAGE_RENDER_INTERVAL = 3;
+const MESSAGE_RENDER_LIMIT = 100;
 
 interface ChatMessage {
   datetime?: Date;
   sender: string;
-  message: string;
+  message?: string;
   color: string;
+  attachmentName?: string;
 }
 
 export default function Index() {
@@ -63,7 +65,19 @@ export default function Index() {
               .split("\n")
               .filter((line) => line.includes("] ")) // filter out lines without "] "
               .map((line) => {
-                const [datetimeUntrimmed, senderMessage] = line.split("] ");
+                const [datetimeUntrimmed, senderMessage] = line
+                  .replace(/\u200e/g, "")
+                  .split("] ");
+                let attachmentName: string | undefined = undefined;
+
+                // Check if the message is defined and contains an attachment
+                if (line.includes("<attached:")) {
+                  const filename = line
+                    .split("<attached: ")[1]
+                    .replace(">", "");
+                  attachmentName = filename;
+                }
+
                 const [sender, message] = senderMessage.split(": ");
                 const datetime = datetimeUntrimmed.replace("[", "");
 
@@ -74,6 +88,7 @@ export default function Index() {
                 } catch (e) {
                   console.error(e);
                 }
+
                 return {
                   datetime: parsedDate,
                   sender,
@@ -84,6 +99,7 @@ export default function Index() {
                       : sender === "Laurens"
                       ? "green"
                       : "black",
+                  attachmentName, // Add the attachmentName to the object
                 };
               })
           );
@@ -102,16 +118,12 @@ export default function Index() {
     if (intervalRef.current) return;
 
     intervalRef.current = setInterval(() => {
-      if (chat.length === consecutiveMessages.length) {
-        clearInterval(intervalRef.current);
-        return;
-      }
-      console.log(
-        "Chat length:",
-        chat.length,
-        "Consecutive messages:",
-        consecutiveMessages.length
-      );
+      // console.log(
+      //   "Chat length:",
+      //   chat.length,
+      //   "Consecutive messages:",
+      //   consecutiveMessages.length
+      // );
 
       setConsecutiveMessages((prevMessages) => {
         if (prevMessages.length === chat.length) return prevMessages;
@@ -120,7 +132,7 @@ export default function Index() {
         return [...prevMessages, chat[prevMessages.length]];
       });
     }, MESSAGE_RENDER_INTERVAL);
-  }, [chat, consecutiveMessages.length]);
+  }, [chat]);
 
   useEffect(() => {
     if (chat.length > 0) {
@@ -129,9 +141,13 @@ export default function Index() {
   }, [chat, consecutivelyRenderMessages]);
   useEffect(() => {
     if (!chat.length) return;
+    if (consecutiveMessages.length >= MESSAGE_RENDER_LIMIT) {
+      clearInterval(intervalRef.current);
+      console.log("Done rendering messages - reached limit");
+    }
     if (consecutiveMessages.length === chat.length) {
       clearInterval(intervalRef.current);
-      console.log("Done rendering messages");
+      console.log("Done rendering messages - reached end of chat");
     }
   }, [consecutiveMessages.length, chat.length]);
 
@@ -207,6 +223,30 @@ export default function Index() {
                 }}
               >
                 {message.message}
+                {message.attachmentName ? (
+                  <a
+                    // href={URL.createObjectURL(
+                    //   attachments.find(
+                    //     (attachment) =>
+                    //       attachment.name === message.attachmentName
+                    //   )!
+                    // )}
+                    download={message.attachmentName}
+                    style={{ color: "white" }}
+                  >
+                    {message.attachmentName}
+                    {/* <img
+                      src={URL.createObjectURL(
+                        attachments.find(
+                          (attachment) =>
+                            attachment.name === message.attachmentName
+                        )!
+                      )}
+                      alt={"TODO: add alt text"}
+                      style={{ maxWidth: "40%" }}
+                    /> */}
+                  </a>
+                ) : null}
                 {/* Time */}
                 <div style={{ fontSize: "0.8em", textAlign: "right" }}>
                   {message.datetime.toLocaleTimeString("nl-NL", {

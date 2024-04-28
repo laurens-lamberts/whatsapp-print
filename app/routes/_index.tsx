@@ -1,11 +1,5 @@
 import type { MetaFunction } from "@remix-run/node";
-import {
-  ChangeEventHandler,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const meta: MetaFunction = () => {
   return [
@@ -77,7 +71,7 @@ export default function Index() {
       console.log("lines", lines);
 
       let previousLine = "";
-      const chatMessages = lines.reduce((acc, line) => {
+      const chatMessages = lines.reduce((acc: string[], line) => {
         const datetimePattern = /^\[\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2}\]/;
         if (!datetimePattern.test(line)) {
           previousLine += " " + line;
@@ -105,7 +99,8 @@ export default function Index() {
           // Check if the message is defined and contains an attachment
           if (line.includes("<attached:")) {
             console.log(
-              "there seems to be an attachment... <-- probably incorrect!"
+              "there seems to be an attachment... <-- probably incorrect!",
+              line
             );
             const filename = line.split("<attached: ")[1].replace(">", "");
             attachmentName = filename;
@@ -152,13 +147,6 @@ export default function Index() {
     if (intervalRef.current) return;
 
     intervalRef.current = setInterval(() => {
-      // console.log(
-      //   "Chat length:",
-      //   chat.length,
-      //   "Consecutive messages:",
-      //   consecutiveMessages.length
-      // );
-
       setConsecutiveMessages((prevMessages) => {
         if (prevMessages.length === chat.length) return prevMessages;
         console.log("Rendering message", prevMessages.length);
@@ -169,10 +157,9 @@ export default function Index() {
   }, [chat]);
 
   useEffect(() => {
-    if (chat.length > 0) {
-      consecutivelyRenderMessages();
-    }
+    if (chat.length > 0) consecutivelyRenderMessages();
   }, [chat, consecutivelyRenderMessages]);
+
   useEffect(() => {
     if (!chat.length) return;
     if (consecutiveMessages.length >= MESSAGE_RENDER_LIMIT) {
@@ -211,7 +198,6 @@ export default function Index() {
       }}
     >
       <h1 style={{ color: "white" }}>Whatsapp export printer</h1>
-      {/* <input type="file" onChange={(e) => showFile(e)} /> */}
       <input
         directory=""
         webkitdirectory=""
@@ -222,16 +208,17 @@ export default function Index() {
         {consecutiveMessages.map((message, i) => (
           <div key={i}>
             {/* If this is the first message of the day, add a day tag */}
-            {i === 0 ||
-            message.datetime.getDate() !== chat[i - 1].datetime.getDate() ? (
-              <h3 style={{ color: "white" }}>
-                {message.datetime.toLocaleDateString("nl-NL", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}
-              </h3>
-            ) : null}
+            {!!message.datetime &&
+              (i === 0 ||
+              message.datetime.getDate() !== chat[i - 1].datetime?.getDate() ? (
+                <h3 style={{ color: "white" }}>
+                  {message.datetime.toLocaleDateString("nl-NL", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </h3>
+              ) : null)}
 
             <div
               style={{
